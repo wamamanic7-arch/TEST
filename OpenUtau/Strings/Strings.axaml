@@ -298,6 +298,7 @@ Do you want to continue by splitting at the nearest position after current playh
   <system:String x:Key="expressiongraph.category.voice">Voice Acting</system:String>
   <system:String x:Key="expressiongraph.node.fluctuation">Fluctuation</system:String>
   <system:String x:Key="expressiongraph.node.intonation">Speech Intonation</system:String>
+  <system:String x:Key="expressiongraph.node.note_random">Random per Note</system:String>
   <system:String x:Key="expressiongraph.node.phrase_position">Position in Phrase</system:String>
   <system:String x:Key="expressiongraph.param.final_ms">Ending (ms)</system:String>
   <system:String x:Key="expressiongraph.node.time">Project Time</system:String>
@@ -352,6 +353,8 @@ Do you want to continue by splitting at the nearest position after current playh
   <system:String x:Key="expressiongraph.name">Name</system:String>
   <system:String x:Key="expressiongraph.new">New</system:String>
   <system:String x:Key="expressiongraph.newcharacter">New Voice Character...</system:String>
+  <system:String x:Key="expressiongraph.wavevoice">Wave Voice</system:String>
+  <system:String x:Key="expressiongraph.wavevoice.tip">Characters made with this checked talk in a game-like, sing-song way: each syllable hops to its own pitch, is clipped short, and pulses with the beat. Use "Voice acting: Wave Voice rhythm" in the piano roll to put the syllables on the beat as well.</system:String>
   <system:String x:Key="expressiongraph.node.abs">Abs</system:String>
   <system:String x:Key="expressiongraph.node.add">Add</system:String>
   <system:String x:Key="expressiongraph.node.clamp">Clamp</system:String>
@@ -672,6 +675,8 @@ Warning: this option removes custom presets.</system:String>
   <system:String x:Key="pianoroll.menu.notes.voiceacting.characterfromrecording">Voice acting: make character from recording</system:String>
   <system:String x:Key="pianoroll.menu.notes.voiceacting.followrecording">Voice acting: follow recording's pitch and dynamics</system:String>
   <system:String x:Key="pianoroll.menu.notes.voiceacting.notesfromrecording">Voice acting: notes from recording</system:String>
+  <system:String x:Key="pianoroll.menu.notes.voiceacting.wavevoice16">Voice acting: Wave Voice rhythm (16th notes)</system:String>
+  <system:String x:Key="pianoroll.menu.notes.voiceacting.wavevoice8">Voice acting: Wave Voice rhythm (8th notes)</system:String>
   <system:String x:Key="pianoroll.menu.notes.randomizetuning">Randomize tuning</system:String>
   <system:String x:Key="pianoroll.menu.notes.refreshrealcurves">Refresh real curves</system:String>
   <system:String x:Key="pianoroll.menu.notes.removetaildash">Remove tail "-"</system:String>

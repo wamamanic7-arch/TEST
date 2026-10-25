@@ -60,7 +60,14 @@ namespace OpenUtau.Core.VoiceActing {
         public float voicing = 100;
         public int seed = 0;
 
-        public VoiceCharacter Clone() => (VoiceCharacter)MemberwiseClone();
+        /// <summary>The game-like Wave Voice way of talking, on top of the emotion; null for none.</summary>
+        public WaveVoice? wave;
+
+        public VoiceCharacter Clone() {
+            var c = (VoiceCharacter)MemberwiseClone();
+            c.wave = wave?.Clone();
+            return c;
+        }
 
         public static readonly string[] PresetNames = {
             "neutral", "cheerful", "gloomy", "angry", "whisper", "timid", "elderly",
@@ -205,35 +212,66 @@ namespace OpenUtau.Core.VoiceActing {
             var pitch = Add(underneath, melody, 740, 130);
             pitch = Add(pitch, Add(drift, jitter, 560, 450), 830, 200);
             pitch = Add(pitch, Node(GraphNodeTypes.Constant, 740, 300, ("value", pitchOffset)), 920, 260);
+            // Wave Voice: each syllable on a pitch of its own, scooping up into it, the whole voice lifted.
+            float waveRows = 0;
+            if (wave != null) {
+                const float top = 680;
+                var hop = Node(GraphNodeTypes.NoteRandom, 380, top,
+                    ("min", -wave.hopSemitones * 100), ("max", wave.hopSemitones * 100), ("step", 100));
+                hop.Set("seed", (wave.seed + seed).ToString(CultureInfo.InvariantCulture));
+                var scoopIn = Node(GraphNodeTypes.MapRange, 200, top + 150,
+                    ("in_min", 0), ("in_max", 1), ("out_min", -wave.scoop), ("out_max", 0));
+                Link(Node(GraphNodeTypes.NoteEnvelope, 20, top + 150, ("attack_ms", wave.scoopMs)), scoopIn,
+                    GraphNodeTypes.Value);
+                var wavePitch = Add(Add(hop, scoopIn, 560, top + 60),
+                    Node(GraphNodeTypes.Constant, 560, top + 160, ("value", wave.lift)), 740, top + 100);
+                pitch = Add(pitch, wavePitch, 1010, 380);
+                waveRows = 340;
+            }
             var overrides = Curve(GraphNodeTypes.MaskedCurveInput, Format.Ustx.PITO, 1100, 260);
             Link(pitch, overrides, "fallback");
             Link(overrides, Node(GraphNodeTypes.PitchOutput, 1280, 260), GraphNodeTypes.Value, GraphNodeTypes.Value);
 
             // 0 until the last finalMs of a phrase, then up to 1 at its end.
-            var phraseEnd = Node(GraphNodeTypes.MapRange, 200, 660,
+            var phraseEnd = Node(GraphNodeTypes.MapRange, 200, 660 + waveRows,
                 ("in_min", finalMs / 1000), ("in_max", 0), ("out_min", 0), ("out_max", 1));
             phraseEnd.Set("clamp", "true");
-            Link(Node(GraphNodeTypes.PhrasePosition, 20, 660), phraseEnd, GraphNodeTypes.Value, "remaining");
+            Link(Node(GraphNodeTypes.PhrasePosition, 20, 660 + waveRows), phraseEnd, GraphNodeTypes.Value, "remaining");
 
-            float row = 840;
-            void Drive(string abbr, Func<UGraphNode, float, UGraphNode> value) {
+            float row = 840 + waveRows;
+            void Drive(string abbr, Func<UGraphNode, float, UGraphNode> value, float height = 150) {
                 if (!Supports(abbr)) {
                     return;
                 }
                 var drawn = Curve(GraphNodeTypes.CurveInput, abbr, 20, row);
                 Link(value(drawn, row), Curve(GraphNodeTypes.CurveOutput, abbr, 920, row), GraphNodeTypes.Value);
-                row += 150;
+                row += height;
             }
-            Drive(Format.Ustx.DYN, (drawn, y) => Add(
-                Add(drawn, Fluctuation(shimmerDepth, 12, 2, 200, y + 40), 560, y),
-                Scale(phraseEnd, -endDecay, 560, y + 70), 740, y));
+            Drive(Format.Ustx.DYN, (drawn, y) => {
+                var dyn = Add(
+                    Add(drawn, Fluctuation(shimmerDepth, 12, 2, 200, y + 40), 560, y),
+                    Scale(phraseEnd, -endDecay, 560, y + 70), 740, y);
+                if (wave == null) {
+                    return dyn;
+                }
+                // Wave Voice: loud on each pulse of the beat and fading through it; each syllable clipped short.
+                var pulse = Node(GraphNodeTypes.Lfo, 380, y + 40,
+                    ("rate", wave.pulsesPerBeat), ("amplitude", -wave.pulseDepth / 2));
+                pulse.Set("shape", "saw");
+                pulse.Set("unit", "beat");
+                var chop = Node(GraphNodeTypes.MapRange, 380, y + 250,
+                    ("in_min", 0), ("in_max", 1), ("out_min", -wave.chopDepth), ("out_max", 0));
+                Link(Node(GraphNodeTypes.NoteEnvelope, 200, y + 200, ("attack_ms", 5), ("release_ms", wave.releaseMs)),
+                    chop, GraphNodeTypes.Value);
+                return Add(dyn, Add(pulse, chop, 560, y + 200), 830, y + 80);
+            }, wave == null ? 150 : 420);
             Drive(Format.Ustx.BREC, (drawn, y) => Add(
                 Add(drawn, Node(GraphNodeTypes.Constant, 200, y + 40, ("value", breathiness)), 560, y),
                 Scale(phraseEnd, endBreath, 560, y + 70), 740, y));
             Drive(Format.Ustx.TENC, (drawn, y) =>
                 Add(drawn, Node(GraphNodeTypes.Constant, 200, y + 40, ("value", tension)), 740, y));
             Drive(Format.Ustx.GENC, (drawn, y) =>
-                Add(drawn, Node(GraphNodeTypes.Constant, 200, y + 40, ("value", gender)), 740, y));
+                Add(drawn, Node(GraphNodeTypes.Constant, 200, y + 40, ("value", gender + (wave?.gender ?? 0))), 740, y));
             Drive(Format.Ustx.GRWC, (drawn, y) => Add(drawn, Scale(phraseEnd, endFry, 560, y + 50), 740, y));
             Drive(Format.Ustx.VOIC, (drawn, y) => Scale(drawn, voicing / 100, 740, y));
             return graph;

@@ -174,8 +174,10 @@ namespace OpenUtau.Core.VoiceActing {
         [MemberData(nameof(Presets))]
         public void EveryPresetCompilesAndDrivesPitchAndWhatTheRendererSupports(string preset) {
             var character = VoiceCharacter.Preset(preset);
-            foreach (bool rendersPitch in new[] { false, true }) {
-                var graph = character.BuildGraph("c", Renderer, new TestRenderer(rendersPitch));
+            var wavy = character.Clone();
+            wavy.wave = new WaveVoice();
+            foreach (var (c, rendersPitch) in new[] { (character, false), (character, true), (wavy, false), (wavy, true) }) {
+                var graph = c.BuildGraph("c", Renderer, new TestRenderer(rendersPitch));
                 var program = ExpressionGraphProgram.Compile(graph, out var error);
                 Assert.True(program != null, error);
                 Assert.True(program!.DrivesPitch);
@@ -281,6 +283,85 @@ namespace OpenUtau.Core.VoiceActing {
             Assert.InRange(EndPitch(50) - EndPitch(0), character.finalDepth * ending - 0.1, character.finalDepth * ending + 0.1);
             Assert.InRange(EndPitch(100) - EndPitch(0), 2 * character.finalDepth * ending - 0.1, 2 * character.finalDepth * ending + 0.1);
             Assert.True(EndPitch(100) > EndPitch(-100) + 4 * character.finalDepth * ending - 1);
+        }
+
+        [Fact]
+        public void NoteRandomHoldsOneStepPerNote() {
+            UExpressionGraph Hops(string seed) {
+                var graph = Graph(
+                    (GraphNodeTypes.NoteRandom, new[] { ("min", "-400"), ("max", "400"), ("step", "100"), ("seed", seed) }),
+                    (GraphNodeTypes.CurveOutput, new[] { ("abbr", "tenc") }));
+                ExpressionGraphEdits.TryLink(graph, 1, 2, GraphNodeTypes.Value);
+                return graph;
+            }
+            var ticks = Grid(0, 1915);
+            var values = Evaluate(Hops("3"), ticks)["tenc"];
+            float At(int tick) => values[Array.IndexOf(ticks, tick)];
+            // The fixture's notes: 0, 480, 1200 and 1680.
+            foreach (var (from, to) in new[] { (0, 475), (480, 955), (1200, 1675), (1680, 1915) }) {
+                Assert.All(ticks.Where(t => t >= from && t <= to), t => Assert.Equal(At(from), At(t)));
+            }
+            Assert.All(values, v => {
+                Assert.InRange(v, -400, 400);
+                Assert.Equal(0, v % 100);
+            });
+            // Between notes, the next note's value, for its consonants.
+            Assert.Equal(At(1200), At(1100));
+            var perNote = new[] { At(0), At(480), At(1200), At(1680) };
+            Assert.True(perNote.Distinct().Count() > 1);
+            Assert.NotEqual(perNote, new[] { 0, 480, 1200, 1680 }.Select(t => Evaluate(Hops("4"), ticks)["tenc"][t / 5]));
+        }
+
+        [Fact]
+        public void WaveVoiceHopsScoopsPulsesAndClipsEachSyllable() {
+            var plain = VoiceCharacter.Preset("neutral");
+            var wavy = plain.Clone();
+            wavy.wave = new WaveVoice();
+            Assert.NotSame(wavy.wave, wavy.Clone().wave);
+            var wave = wavy.wave;
+            var (plainSource, plainProgram) = CharacterFixture(plain);
+            var (waveSource, waveProgram) = CharacterFixture(wavy);
+            var ticks = Grid(250, 955);
+            var flat = Enumerable.Repeat(6000f, ticks.Length).ToArray();
+            var zero = new float[ticks.Length];
+            var pitch = new PhrasePitch(250, UCurve.interval, flat, zero, zero, flat);
+            float[] Pitch(PhraseSource source, ExpressionGraphProgram program) =>
+                program.EvaluatePitch(new GraphContext(source, pitch, source.PhraseGroups[0].Start), ticks)!;
+            float[] Dyn(PhraseSource source, ExpressionGraphProgram program) =>
+                program.Evaluate(new GraphContext(source, pitch, source.PhraseGroups[0].Start), ticks)[Format.Ustx.DYN];
+            // The same character apart from Wave Voice, so the difference is Wave Voice alone.
+            var pitchDiff = Pitch(waveSource, waveProgram).Zip(Pitch(plainSource, plainProgram), (a, b) => a - b).ToArray();
+            var dynDiff = Dyn(waveSource, waveProgram).Zip(Dyn(plainSource, plainProgram), (a, b) => a - b).ToArray();
+            float P(int tick) => pitchDiff[Array.IndexOf(ticks, tick)];
+            float D(int tick) => dynDiff[Array.IndexOf(ticks, tick)];
+
+            // After the scoop, a whole-semitone hop above the lift, held through the syllable.
+            float hop = P(600) - wave.lift;
+            Assert.InRange(hop, -wave.hopSemitones * 100, wave.hopSemitones * 100);
+            Assert.Equal(0, Math.Round(hop) % 100);
+            Assert.Equal(P(600), P(900), 2);
+            // The second syllable starts the scoop below it.
+            Assert.Equal(P(600) - wave.scoop, P(480), 2);
+            // Loud on the pulse, fading through it: two pulses a beat, from 1440 ticks into the project.
+            Assert.InRange(D(485) - D(715), 50, 60);
+            // Clipped at the end of the syllable.
+            Assert.True(D(955) < D(715) - 60);
+        }
+
+        [Fact]
+        public void WaveVoiceRhythmSaysOneSyllablePerStep() {
+            var project = new UProject();
+            UNote Note(int position, int duration) => project.CreateNote(60, position, duration);
+            var notes = new[] { Note(10, 90), Note(130, 270), Note(400, 50), Note(1500, 100), Note(1600, 300) };
+            // Steps of 240 ticks, in a part 100 ticks into the project: the first phrase from the project's step at
+            // 240, the second from the step nearest 1600.
+            var steps = WaveVoice.Rhythm(100, notes, 240);
+            Assert.Equal(new[] { (140, 240), (380, 240), (620, 240), (1580, 240), (1820, 240) }, steps);
+            // A phrase whose nearest step would crowd the phrase before moves later, after a step of rest.
+            var crowded = WaveVoice.Rhythm(0,
+                new[] { Note(0, 100), Note(100, 100), Note(200, 100), Note(300, 100), Note(520, 80) }, 120);
+            Assert.Equal(new[] { 0, 120, 240, 360, 600 }, crowded.Select(s => s.position));
+            Assert.Empty(WaveVoice.Rhythm(0, notes, 0));
         }
 
         [Fact]

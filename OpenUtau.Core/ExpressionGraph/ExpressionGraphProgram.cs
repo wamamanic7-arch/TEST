@@ -182,6 +182,30 @@ namespace OpenUtau.Core.ExpressionGraph {
             }
             return found >= 0 && tick < notes[found].End ? notes[found] : null;
         }
+
+        /// <summary>
+        /// The note covering a part-relative tick, else the next one, whose consonants may already be sounding;
+        /// else the last note. Null without notes.
+        /// </summary>
+        public NoteSource? NoteAtOrNext(int tick) {
+            if (notes.Length == 0) {
+                return null;
+            }
+            int lo = 0, hi = notes.Length - 1, found = -1;
+            while (lo <= hi) {
+                int mid = (lo + hi) / 2;
+                if (notes[mid].Position <= tick) {
+                    found = mid;
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+            if (found >= 0 && tick < notes[found].End) {
+                return notes[found];
+            }
+            return found + 1 < notes.Length ? notes[found + 1] : notes[^1];
+        }
     }
 
     /// <summary>

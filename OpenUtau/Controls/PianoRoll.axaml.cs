@@ -149,6 +149,8 @@ namespace OpenUtau.App.Controls {
                 new AlignNotesToRecording(),
                 new FollowRecording(),
                 new CharacterFromRecording(),
+                new WaveVoiceRhythm(8, "pianoroll.menu.notes.voiceacting.wavevoice8"),
+                new WaveVoiceRhythm(16, "pianoroll.menu.notes.voiceacting.wavevoice16"),
             }.Select(edit => new MenuItemViewModel() {
                 Header = ThemeManager.GetString(edit.Name),
                 Command = noteBatchEditCommand,

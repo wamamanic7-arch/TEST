@@ -60,7 +60,7 @@ namespace OpenUtau.Core.Editing {
         }
 
         /// <summary>Lengthens the part to hold notes up to a part tick, if it is shorter.</summary>
-        protected static void Fit(UProject project, UVoicePart part, int end, List<UCommand> commands) {
+        internal static void Fit(UProject project, UVoicePart part, int end, List<UCommand> commands) {
             if (end > part.Duration) {
                 commands.Insert(0, new ResizeVoicePartCommand(project, part, end - part.Duration, false));
             }
@@ -126,6 +126,49 @@ namespace OpenUtau.Core.Editing {
             bool pitchOverride = ExpressionGraph.ExpressionGraphProgram.PrefersPitchOverride(
                 project, project.tracks[part.trackNo]);
             return Execute(docManager, PerformanceTransfer.FollowPitchAndDynamics(project, part, take, pitchOverride));
+        }
+    }
+
+    /// <summary>
+    /// Wave Voice's rhythm: the selected notes, or all of them, said one per grid step of the given note value,
+    /// with a rest of at least a step at each pause.
+    /// </summary>
+    public class WaveVoiceRhythm : BatchEdit {
+        readonly int division;
+
+        /// <param name="division">The note value of a step: 8 for eighth notes, 16 for sixteenths.</param>
+        public WaveVoiceRhythm(int division, string name) {
+            this.division = division;
+            Name = name;
+        }
+
+        public string Name { get; }
+
+        public void Run(UProject project, UVoicePart part, List<UNote> selectedNotes, DocManager docManager) {
+            var notes = (selectedNotes.Count > 0 ? selectedNotes : part.notes.ToList()).OrderBy(n => n.position).ToList();
+            var targets = WaveVoice.Rhythm(part.position, notes, project.resolution * 4 / division);
+            var commands = new List<UCommand>();
+            for (int i = 0; i < notes.Count; i++) {
+                var (position, duration) = targets[i];
+                if (position != notes[i].position) {
+                    commands.Add(new MoveNoteCommand(part, notes[i], position - notes[i].position, 0));
+                }
+                if (duration != notes[i].duration) {
+                    commands.Add(new ResizeNoteCommand(part, notes[i], duration - notes[i].duration));
+                }
+            }
+            if (targets.Count > 0) {
+                VoiceActingEdit.Fit(project, part, targets[^1].position + targets[^1].duration, commands);
+            }
+            if (commands.Count == 0) {
+                return;
+            }
+            docManager.StartUndoGroup("command.batch.note");
+            try {
+                commands.ForEach(docManager.ExecuteCmd);
+            } finally {
+                docManager.EndUndoGroup();
+            }
         }
     }
 

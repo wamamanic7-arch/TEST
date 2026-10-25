@@ -126,7 +126,10 @@ namespace OpenUtau.App.Controls {
             menu.Open(NewButton);
         }
 
-        /// <summary>A voice character graph from a preset, for a renderer: the renderers the tracks use first.</summary>
+        /// <summary>
+        /// A voice character graph from a preset, for a renderer: the renderers the tracks use first. With Wave Voice
+        /// checked, it talks in the game-like Wave Voice way too.
+        /// </summary>
         void OnNewCharacter(object? sender, RoutedEventArgs e) {
             var menu = new ContextMenu();
             var used = Project.tracks.Select(t => t.RendererSettings?.renderer).Where(r => r != null)
@@ -138,6 +141,10 @@ namespace OpenUtau.App.Controls {
                     presetItem.Click += (s, args) => {
                         var character = Core.VoiceActing.VoiceCharacter.Preset(preset);
                         character.name = ThemeManager.GetString($"voiceacting.preset.{preset}");
+                        if (WaveVoiceBox.IsChecked == true) {
+                            character.wave = new Core.VoiceActing.WaveVoice();
+                            character.name += $" · {ThemeManager.GetString("expressiongraph.wavevoice")}";
+                        }
                         selectedId = character.AddToProject(Project, renderer!);
                         Refresh();
                     };

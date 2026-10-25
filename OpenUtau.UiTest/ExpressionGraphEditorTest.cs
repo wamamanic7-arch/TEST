@@ -190,6 +190,20 @@ namespace OpenUtau.UiTest {
                 Assert.Equal(Renderers.CLASSIC, graph.renderer);
                 Assert.True(project.expressions.ContainsKey(Core.VoiceActing.VoiceCharacter.IntonationCurve));
                 HeadlessUi.SaveScreenshot(window, nameof(VoiceCharactersOpenInTheEditor));
+
+                // Wave Voice is a setting apart from the emotion presets.
+                Assert.False(editor.FindControl<CheckBox>("WaveVoiceBox")!.IsChecked);
+                var wavy = Core.VoiceActing.VoiceCharacter.Preset("cheerful");
+                wavy.name = "Cheerful · Wave Voice";
+                wavy.wave = new Core.VoiceActing.WaveVoice();
+                string id = wavy.AddToProject(project, Renderers.CLASSIC);
+                HeadlessUi.Flush();
+                editor.FindControl<ListBox>("GraphList")!.SelectedIndex = 1;
+                HeadlessUi.Flush();
+                var waveGraph = project.expressionGraphs!.Single(g => g.id == id);
+                Assert.Equal(waveGraph.nodes.Count, Nodes(canvas).Length);
+                Assert.Contains(waveGraph.nodes, n => n.type == GraphNodeTypes.NoteRandom);
+                HeadlessUi.SaveScreenshot(window, "WaveVoiceCharacter");
                 var errors = HeadlessUi.Errors.Snapshot();
                 Assert.True(errors.Count == 0, string.Join("\n", errors));
             } finally {

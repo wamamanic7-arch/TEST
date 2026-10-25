@@ -127,6 +127,7 @@ namespace OpenUtau.Core.ExpressionGraph {
         public const string Fluctuation = "fluctuation";
         public const string PhrasePosition = "phrase_position";
         public const string Intonation = "intonation";
+        public const string NoteRandom = "note_random";
 
         /// <summary>The port of single-input nodes.</summary>
         public const string Value = "value";
@@ -427,6 +428,26 @@ namespace OpenUtau.Core.ExpressionGraph {
                     }
                     return result;
                 }),
+            // One random value per note, from min to max, rounded to a multiple of "step" if it is set: held over
+            // the whole note and the consonants leading into it. It depends only on where the note starts in the
+            // project and the seed, so editing other notes leaves it alone.
+            new GraphNodeType(NoteRandom, GraphNodeRole.Input, new[] { "min", "max" }, new float[] { 0, 1 }, a => {
+                int.TryParse(a.Node.GetString("seed"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int seed);
+                double step = a.Node.GetFloat("step", 0);
+                var result = new float[a.Ticks.Length];
+                for (int i = 0; i < result.Length; i++) {
+                    double lo = Math.Min(a.Inputs[0][i], a.Inputs[1][i]);
+                    double hi = Math.Max(a.Inputs[0][i], a.Inputs[1][i]);
+                    var note = a.Context.NoteAtOrNext(a.Ticks[i]);
+                    double value = note == null ? lo
+                        : lo + (hi - lo) * RandomUnit(a.Context.PartPosition + note.Position, seed);
+                    if (step > 0 && double.IsFinite(step)) {
+                        value = Math.Clamp(Math.Round(value / step) * step, lo, hi);
+                    }
+                    result[i] = (float)value;
+                }
+                return result;
+            }),
         }.ToDictionary(t => t.Name);
 
         public static IReadOnlyDictionary<string, GraphNodeType> All => types;
@@ -444,7 +465,7 @@ namespace OpenUtau.Core.ExpressionGraph {
             (MathCategory, new[] { Add, Subtract, Multiply, Divide, Mix, Min, Max, Abs, MapRange, Clamp }),
             (TimeCategory, new[] { Time, Lfo, RandomRange, NotePosition, PhraseNotes, NoteEnvelope, Smooth, Slew }),
             (LogicCategory, new[] { Compare, And, Or, Not, IfElse }),
-            (VoiceCategory, new[] { Intonation, Fluctuation, PhrasePosition }),
+            (VoiceCategory, new[] { Intonation, Fluctuation, PhrasePosition, NoteRandom }),
             (OutputCategory, new[] { CurveOutput, PhonemeOutput, PitchOutput }),
         };
 
@@ -485,6 +506,7 @@ namespace OpenUtau.Core.ExpressionGraph {
                 "less", "less_equal", "greater", "greater_equal", "equal", "not_equal") },
             [Fluctuation] = new[] { Number("rate", "4"), Number("octaves", "3"), Number("seed", "0") },
             [Intonation] = new[] { Number("final_ms", "400") },
+            [NoteRandom] = new[] { Number("step", "0"), Number("seed", "0") },
         };
 
         /// <summary>
