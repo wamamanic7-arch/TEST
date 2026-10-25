@@ -126,7 +126,7 @@
                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Focusable="False"
                 Content="{Binding PhonemizerTag}" Click="PhonemizerButtonClicked" ContextRequested="PhonemizerButtonContextRequested"
                 ToolTip.Tip="{Binding Phonemizer}" ContextMenu="{StaticResource PhonemizerMenuRes}"/>
-        <Button Grid.Row="3" Grid.ColumnSpan="3" Classes="clear" Margin="1" Padding="2,0,0,0" Height="18" IsVisible="{Binding IsRendererVisible}"
+        <Button Grid.Row="3" Grid.ColumnSpan="2" Classes="clear" Margin="1" Padding="2,0,0,0" Height="18" IsVisible="{Binding IsRendererVisible}"
                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Focusable="False"
                 Content="{Binding Renderer}" Click="RendererButtonClicked" ContextRequested="RendererButtonContextRequested"
                 ToolTip.Tip="{DynamicResource tracks.selectrenderer}" ContextMenu="{StaticResource RendererMenuRes}"/>
@@ -187,6 +187,16 @@
             </ContextMenu>
           </ToggleButton.ContextMenu>
         </ToggleButton>
+        <!-- Voice acting: a speech bubble, lit while the track has a character or a voice filter. -->
+        <Button Grid.Row="3" Grid.Column="2" Name="VoiceActingButton" VerticalAlignment="Center"
+                Classes="toolbar fxButton" Margin="1" Width="18" Height="18"
+                IsVisible="{Binding IsRendererVisible}"
+                ToolTip.Tip="{DynamicResource tracks.voiceacting.tip}"
+                Classes.fxOn="{Binding VoiceActingOn}"
+                Command="{Binding OpenVoiceActingDialog}">
+          <Path Fill="{DynamicResource SystemControlForegroundBaseHighBrush}" Height="18" Width="18"
+                Data="F1 M4 4.5h10a1.5 1.5 0 0 1 1.5 1.5v5.5a1.5 1.5 0 0 1-1.5 1.5H8.5l-3 2.5v-2.5H4a1.5 1.5 0 0 1-1.5-1.5V6A1.5 1.5 0 0 1 4 4.5z M5.8 7.6h1.2v2.3H5.8z M8.4 6.6h1.2v4.3H8.4z M11 7.6h1.2v2.3H11z"/>
+        </Button>
         <Button Grid.Row="3" Grid.Column="3" Margin="1" Padding="0" Width="18" Height="18" Background="Transparent"
                       Click="TrackSettingsButtonClicked" IsVisible="{Binding IsRendererVisible}"
                       ToolTip.Tip="{DynamicResource tracks.tracksettings}">
@@ -259,6 +269,7 @@
           <MenuItem Classes="context" Header="{DynamicResource tracks.duplicatesettings}" Command="{Binding DuplicateSettings}"/>
           <MenuItem Classes="context" Header="{DynamicResource dialogs.voicecolorremapping}" Command="{Binding VoiceColorRemapping}"/>
           <Separator/>
+          <MenuItem Classes="context" Header="{DynamicResource tracks.voiceacting}" Command="{Binding OpenVoiceActingDialog}"/>
           <MenuItem Classes="context" Header="{DynamicResource tracks.mixfx}" Command="{Binding OpenMixFxDialog}"/>
         </ContextMenu>
       </Grid.ContextMenu>

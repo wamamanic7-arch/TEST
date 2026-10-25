@@ -191,8 +191,7 @@ namespace OpenUtau.UiTest {
                 Assert.True(project.expressions.ContainsKey(Core.VoiceActing.VoiceCharacter.IntonationCurve));
                 HeadlessUi.SaveScreenshot(window, nameof(VoiceCharactersOpenInTheEditor));
 
-                // Wave Voice is a setting apart from the emotion presets.
-                Assert.False(editor.FindControl<CheckBox>("WaveVoiceBox")!.IsChecked);
+                // A Wave Voice character, as a track's Voice Acting panel makes.
                 var wavy = Core.VoiceActing.VoiceCharacter.Preset("cheerful");
                 wavy.name = "Cheerful · Wave Voice";
                 wavy.wave = new Core.VoiceActing.WaveVoice();

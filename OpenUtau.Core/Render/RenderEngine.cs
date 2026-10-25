@@ -178,7 +178,10 @@ namespace OpenUtau.Core.Render {
                         planner.RegisterWavePcm(wave, trim.offsetMs, trim.estimatedLengthMs, trim.channels, trim.pcm);
                     }
                 }
-                var fader = new Fader(planner.GetTrackSource(i));
+                // The voice filter is part of the voice, so it comes before the track's volume and pan.
+                ISignalSource voice = wait ? VoiceFilterSource.WrapWith(planner.GetTrackSource(i), track.VoiceFilter)
+                    : VoiceFilterSource.WrapLive(planner.GetTrackSource(i), track);
+                var fader = new Fader(voice);
                 fader.Scale = PlaybackManager.DecibelToVolume(track.Muted ? -24 : track.Volume);
                 fader.Pan = (float)track.Pan;
                 fader.SetScaleToTarget();

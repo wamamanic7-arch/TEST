@@ -45,6 +45,8 @@ namespace OpenUtau.App.ViewModels {
         [Reactive] public partial bool IsPhonemizerVisible { get; set; }
         [Reactive] public partial bool IsRendererVisible { get; set; }
         [Reactive] public partial bool MixFxEnabled { get; set; }
+        /// <summary>Whether the track has a voice character or a voice filter on.</summary>
+        [Reactive] public partial bool VoiceActingOn { get; set; }
         [Reactive] public partial IBrush HeaderBorderBrush { get; set; } = ThemeManager.NeutralAccentBrushSemi;
 
         public ViewModelActivator Activator { get; }
@@ -125,6 +127,7 @@ namespace OpenUtau.App.ViewModels {
             Muted = track.Muted;
             Solo = track.Solo;
             MixFxEnabled = track.MixFx?.Enabled ?? false;
+            VoiceActingOn = Core.VoiceActing.TrackVoice.IsActive(DocManager.Inst.Project, track);
             this.WhenAnyValue(x => x.Volume)
                 .Subscribe(volume => {
                     track.Volume = volume;
@@ -382,6 +385,7 @@ namespace OpenUtau.App.ViewModels {
             this.RaisePropertyChanged(nameof(Solo));
             MixFxEnabled = track.MixFx?.Enabled ?? false;
             this.RaisePropertyChanged(nameof(MixFxEnabled));
+            VoiceActingOn = Core.VoiceActing.TrackVoice.IsActive(DocManager.Inst.Project, track);
             this.RaisePropertyChanged(nameof(Volume));
             this.RaisePropertyChanged(nameof(Pan));
             RefreshAvatar();
@@ -455,6 +459,7 @@ namespace OpenUtau.App.ViewModels {
                 Volume = track.Volume,
                 Pan = track.Pan,
                 TrackColor = track.TrackColor,
+                VoiceFilter = track.VoiceFilter?.Clone(),
                 TrackExpressions = track.TrackExpressions.Select(exp => exp.Clone()).ToList()
             };
             DocManager.Inst.ExecuteCmd(new AddTrackCommand(DocManager.Inst.Project, newTrack));
@@ -481,6 +486,7 @@ namespace OpenUtau.App.ViewModels {
                 Volume = track.Volume,
                 Pan = track.Pan,
                 TrackColor = track.TrackColor,
+                VoiceFilter = track.VoiceFilter?.Clone(),
                 TrackExpressions = track.TrackExpressions.Select(exp => exp.Clone()).ToList()
             }));
             DocManager.Inst.EndUndoGroup();
@@ -495,6 +501,12 @@ namespace OpenUtau.App.ViewModels {
         public void OpenMixFxDialog() {
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null) {
                 MixFxDialog.Open(desktop.MainWindow, track);
+            }
+        }
+
+        public void OpenVoiceActingDialog() {
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null) {
+                VoiceActingDialog.Open(desktop.MainWindow, track);
             }
         }
     }

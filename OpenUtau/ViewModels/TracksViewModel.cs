@@ -531,6 +531,11 @@ namespace OpenUtau.App.ViewModels {
                 Notify();
                 MessageBus.Current.SendMessage(new TracksRefreshEvent());
                 MessageBus.Current.SendMessage(new TrackSelectionEvent(SelectedTracks.ToArray()));
+            } else if (cmd is Core.ExpressionGraph.SetExpressionGraphsCommand || cmd is Core.VoiceActing.SetVoiceFilterCommand) {
+                // Characters and voice filters light the tracks' voice acting buttons.
+                foreach (var track in Project.tracks) {
+                    MessageBus.Current.SendMessage(new MixFxChangedNotification(track.TrackNo));
+                }
             } else if (cmd is UNotification) {
                 if (cmd is LoadProjectNotification loadProjectNotif) {
                     Parts.Clear();

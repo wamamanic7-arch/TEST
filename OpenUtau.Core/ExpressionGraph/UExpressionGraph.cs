@@ -21,6 +21,11 @@ namespace OpenUtau.Core.ExpressionGraph {
         /// pitch override, PITO.
         /// </summary>
         public string? preferredPitchCurve;
+        /// <summary>
+        /// The voice character the graph was built from, if it was; the Voice Acting panel edits it and rebuilds the
+        /// graph from it.
+        /// </summary>
+        public VoiceActing.VoiceCharacter? character;
         public List<UGraphNode> nodes = new List<UGraphNode>();
         public List<UGraphLink> links = new List<UGraphLink>();
 
@@ -30,6 +35,7 @@ namespace OpenUtau.Core.ExpressionGraph {
                 name = name,
                 renderer = renderer,
                 preferredPitchCurve = preferredPitchCurve,
+                character = character?.Clone(),
                 nodes = nodes.Select(n => n.Clone()).ToList(),
                 links = links.Select(l => l.Clone()).ToList(),
             };

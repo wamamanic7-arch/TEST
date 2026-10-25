@@ -145,7 +145,18 @@ namespace OpenUtau.Core.Editing {
         public string Name { get; }
 
         public void Run(UProject project, UVoicePart part, List<UNote> selectedNotes, DocManager docManager) {
-            var notes = (selectedNotes.Count > 0 ? selectedNotes : part.notes.ToList()).OrderBy(n => n.position).ToList();
+            var notes = selectedNotes.Count > 0 ? selectedNotes : part.notes.ToList();
+            Execute(docManager, Commands(project, part, notes, division));
+        }
+
+        /// <summary>Puts the notes of every voice part on a track in the rhythm, as one undoable step.</summary>
+        public static void RunOnTrack(UProject project, int trackNo, int division, DocManager docManager) {
+            Execute(docManager, project.parts.OfType<UVoicePart>().Where(p => p.trackNo == trackNo)
+                .SelectMany(part => Commands(project, part, part.notes.ToList(), division)).ToList());
+        }
+
+        static List<UCommand> Commands(UProject project, UVoicePart part, List<UNote> notes, int division) {
+            notes = notes.OrderBy(n => n.position).ToList();
             var targets = WaveVoice.Rhythm(part.position, notes, project.resolution * 4 / division);
             var commands = new List<UCommand>();
             for (int i = 0; i < notes.Count; i++) {
@@ -160,6 +171,10 @@ namespace OpenUtau.Core.Editing {
             if (targets.Count > 0) {
                 VoiceActingEdit.Fit(project, part, targets[^1].position + targets[^1].duration, commands);
             }
+            return commands;
+        }
+
+        static void Execute(DocManager docManager, List<UCommand> commands) {
             if (commands.Count == 0) {
                 return;
             }

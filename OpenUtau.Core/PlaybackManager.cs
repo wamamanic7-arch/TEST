@@ -587,7 +587,8 @@ namespace OpenUtau.Core {
                         DocManager.Inst.ExecuteCmd(new ProgressBarNotification(0, $"Exporting to {file}."));
 
                         CheckFileWritable(file);
-                        WaveFileWriter.CreateWaveFile16(file, new ExportAdapter(trackMixes[i]).ToMono(1, 0));
+                        var voice = VoiceFilterSource.WrapWith(trackMixes[i], project.tracks[i].VoiceFilter);
+                        WaveFileWriter.CreateWaveFile16(file, new ExportAdapter(voice).ToMono(1, 0));
                         DocManager.Inst.ExecuteCmd(new ProgressBarNotification(0, $"Exported to {file}."));
                     }
                 } catch (IOException ioe) {

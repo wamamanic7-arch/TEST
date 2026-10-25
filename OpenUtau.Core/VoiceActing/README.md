@@ -3,6 +3,24 @@
 Tools for making voicebanks speak lines rather than sing them. Characters get speech intonation and the small
 unsteadiness of a human voice automatically. A take you record yourself can set a line's timing, melody and loudness.
 
+## The Voice Acting panel
+
+Click the speech bubble on a track's header (next to the settings gear), or right-click the track and choose
+**Voice Acting...**. The panel has three tabs. Each starts with an On/Off switch and one sentence on what it does,
+and every control has a tooltip:
+
+- **Character**: pick an emotion tile (Neutral, Cheerful, Gloomy, Angry, Whisper, Timid, Elderly). Then adjust
+  Expressiveness, Pitch and Breathiness.
+- **Wave Voice**: game-style talking (see [Wave Voice](#wave-voice)), with sliders for note jumps, bounce-in,
+  voice height and size, beat pulse and choppiness. **New melody** re-rolls the notes. The **Rhythm** buttons put
+  every syllable on the track on 8th or 16th notes.
+- **Filter**: the [PS1 filter](#ps1-filter). Pick a tile (Clean, Classic, Crunchy, Old TV, Echo), then fine-tune it.
+
+Changes are heard right away. **OK** keeps them as one undo step; **Cancel** or closing the window puts the track
+back. The Rhythm buttons edit the notes immediately and undo separately. The speech bubble lights up while a track
+has a character or the filter on. The Filter tab works on any track, even a recorded one; the other two need a
+singer.
+
 ## Voice characters
 
 A voice character is an expression graph. It adds the following on top of whatever you draw, at render time, so
@@ -33,8 +51,8 @@ like a statement, 50 stays level, 100 rises like a question, and negative values
 ### Wave Voice
 
 Wave Voice is a game-like, sing-song way of talking, as in Animal Crossing or Friday Night Funkin'. It is a separate
-setting from the emotion presets and works with any of them. Tick **Wave Voice** above **New Voice Character...**
-before choosing a preset, and the new character also gets:
+setting from the emotion and works with or without one: switch it on in the Voice Acting panel's **Wave Voice** tab.
+The character then also gets:
 
 | What | Where it goes | `WaveVoice` value (default) |
 | --- | --- | --- |
@@ -47,9 +65,30 @@ before choosing a preset, and the new character also gets:
 The hops depend only on where each note starts, so editing one syllable doesn't reshuffle the others. Change
 `seed` on the **Random per Note** node for a different tune. The pulse follows the project's tempo.
 
-For the rhythm, select notes (or none, for all) and use **Voice acting: Wave Voice rhythm (8th notes)** or
-**(16th notes)** in the piano roll's **Notes** menu. Each syllable then takes exactly one step of that length,
-in order. A pause of at least a step starts a new phrase on the nearest step, with at least a step of rest.
+For the rhythm, use the panel's **Rhythm** buttons for the whole track. For just some notes, select them and use
+**Voice acting: Wave Voice rhythm (8th notes)** or **(16th notes)** in the piano roll's **Notes** menu. Each
+syllable then takes exactly one step of that length, in order. A pause of at least a step starts a new phrase on
+the nearest step, with at least a step of rest.
+
+## PS1 filter
+
+The PS1 filter makes a track's voice sound as if a PlayStation played it. It is stored on the track
+(`UTrack.VoiceFilter`) and runs on the rendered voice before the track's volume, pan and Track Polish, in
+playback and in both mixdown and per-track export. In order:
+
+1. A 6th-order low-pass, then resampling to the game sample rate: 22050, 11025 or 8000 Hz.
+2. **Console compression**: an encode and decode through the SPU's own sample format. That is 4-bit ADPCM in
+   28-sample blocks, with the best of its five predictor filters and shift chosen per block, so the artifacts are
+   the console's.
+3. **Reverb** (optional): a small SPU-style reverb at the game rate. It is a Room, Hall or Space echo made of damped
+   feedback delays into all-pass diffusers. It is in the style of the console's reverb, not a copy of its
+   registers.
+4. Playback at 44.1 kHz with the SPU's 4-point Gaussian interpolation, which gives the PS1 its muffled sound.
+5. **Old TV speaker** (optional): mono, band-limited to about 280 Hz–4.2 kHz and slightly overdriven.
+6. **Filter amount** blends the original voice back in, time-aligned with the processed one. **Volume** sets the
+   level.
+
+The filter delays the track by about 32 game-rate samples (1.5 ms at 22 kHz, 4 ms at 8 kHz).
 
 ### Graph nodes
 
@@ -88,6 +127,11 @@ syllables from loudness dips between voiced peaks (after de Jong & Wempe, 2009).
 
 - `VoiceCharacter`: character values, presets, `BuildGraph`, `AddToProject`, `FittedTo`.
 - `WaveVoice`: Wave Voice values (`VoiceCharacter.wave`) and `Rhythm`.
+- `TrackVoice`: a track's character (kept in its graph's `character`), building the graph state for the panel,
+  and `SetVoiceFilterCommand`.
+- `Ustx/UVoiceFilter.cs`, `SignalChain/VoiceFilterSource.cs`, `SignalChain/Effects/Ps1Filter.cs`,
+  `SignalChain/Effects/Ps1Adpcm.cs`: the PS1 filter.
+- App: `Views/VoiceActingDialog`, `ViewModels/VoiceActingViewModel`, and the button on `Controls/TrackHeader`.
 - `VoiceAnalysis`: `VoiceAnalyzer` (pitch, loudness, aperiodicity every 10 ms) and `VoiceProfile`.
 - `SpeechSegmenter`: syllable segmentation and fitting segments to a note count.
 - `PerformanceTransfer`: `ReferenceTake` (finding and analyzing the take) and notes/curves from it.
@@ -98,7 +142,9 @@ syllables from loudness dips between voiced peaks (after de Jong & Wempe, 2009).
 
 - Recording from the microphone inside OpenUtau. For now, record elsewhere and import the file.
 - Aligning by phonemes (forced alignment) rather than by syllable count.
-- A slider panel for characters outside the graph editor.
+- The panel can't switch off a character that comes from a renderer's *default* graph rather than the track's
+  own. Untick "Default for this renderer" in the graph editor instead.
+- Character edits re-render the track, so while it is playing they are heard from the next play.
 - Following breathiness from the take (aperiodicity is measured but not yet written to BREC).
 - Speech-specific phonemizers or voicebanks. Singing voicebanks speak well enough for "talkloid" work, but
   speech-trained banks would sound more natural.

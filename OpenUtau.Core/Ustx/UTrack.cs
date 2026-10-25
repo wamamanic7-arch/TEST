@@ -96,6 +96,8 @@ namespace OpenUtau.Core.Ustx {
         // Per-track post-processing FX.  null = no FX configured (bypass).
         // Backwards compatible: older ustx files simply load with this null.
         public UMixFx MixFx { get; set; }
+        /// <summary>The voice acting PS1 filter, before the fader; null for none. Older files load with none.</summary>
+        public UVoiceFilter? VoiceFilter { get; set; }
         public double Volume { set; get; }
         public double Pan { set; get; }
 

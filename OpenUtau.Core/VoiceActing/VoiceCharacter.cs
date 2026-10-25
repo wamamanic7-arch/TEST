@@ -22,6 +22,12 @@ namespace OpenUtau.Core.VoiceActing {
             new UExpressionDescriptor("intonation (curve)", IntonationCurve, -100, 100, 0) { type = UExpressionType.Curve };
 
         public string name = "Character";
+        /// <summary>
+        /// The preset the character started from, one of <see cref="PresetNames"/>, or <see cref="NoEmotion"/>
+        /// for a voice without the speech melody, as <see cref="Plain"/> makes.
+        /// </summary>
+        public string emotion = "neutral";
+        public const string NoEmotion = "off";
 
         /// <summary>Added to the pitch, in cents.</summary>
         public float pitchOffset = 0;
@@ -75,7 +81,10 @@ namespace OpenUtau.Core.VoiceActing {
 
         /// <summary>A starting point for a kind of character, by one of <see cref="PresetNames"/>.</summary>
         public static VoiceCharacter Preset(string preset) {
-            var c = new VoiceCharacter { name = preset };
+            if (preset == NoEmotion) {
+                return Plain();
+            }
+            var c = new VoiceCharacter { name = preset, emotion = preset };
             switch (preset) {
                 case "cheerful":
                     c.pitchOffset = 150; c.expressiveness = 1.4f; c.syllableArc = 45; c.finalDepth = 200;
@@ -104,6 +113,22 @@ namespace OpenUtau.Core.VoiceActing {
             }
             return c;
         }
+
+        /// <summary>
+        /// A voice without speech melody, unsteadiness or tone of its own: the notes as drawn, for Wave Voice alone.
+        /// </summary>
+        public static VoiceCharacter Plain() => new VoiceCharacter {
+            name = NoEmotion,
+            emotion = NoEmotion,
+            declination = 0,
+            finalDepth = 0,
+            syllableArc = 0,
+            driftDepth = 0,
+            jitterDepth = 0,
+            shimmerDepth = 0,
+            endDecay = 0,
+            endBreath = 0,
+        };
 
         /// <summary>
         /// Takes the melody and unsteadiness measured in a recording; keeps the tone, which a recording of the
@@ -149,6 +174,7 @@ namespace OpenUtau.Core.VoiceActing {
                 name = name,
                 renderer = renderer,
                 preferredPitchCurve = Format.Ustx.PITO,
+                character = Clone(),
             };
             UGraphNode Node(string type, float x, float y, params (string key, float value)[] values) {
                 var node = ExpressionGraphEdits.AddNode(graph, type, x, y);

@@ -55,12 +55,8 @@
       </UniformGrid>
       <Button DockPanel.Dock="Bottom" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
               Margin="0,6,0,0" Content="{DynamicResource expressiongraph.newcharacter}"
-              Click="OnNewCharacter" Name="NewCharacterButton"/>
-      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,6,0,0"
-                  ToolTip.Tip="{DynamicResource expressiongraph.wavevoice.tip}">
-        <CheckBox Name="WaveVoiceBox"/>
-        <TextBlock Text="{DynamicResource expressiongraph.wavevoice}" VerticalAlignment="Center"/>
-      </StackPanel>
+              Click="OnNewCharacter" Name="NewCharacterButton"
+              ToolTip.Tip="{DynamicResource expressiongraph.newcharacter.tip}"/>
       <ListBox Name="GraphList" SelectionChanged="OnGraphSelected"/>
     </DockPanel>
     <Border Grid.Column="1" Margin="0,10,10,0" BorderThickness="1" CornerRadius="4"
