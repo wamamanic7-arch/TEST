@@ -165,6 +165,40 @@ namespace OpenUtau.UiTest {
         });
 
         [Fact]
+        public void VoiceCharactersOpenInTheEditor() => HeadlessUi.Run(() => {
+            MainWindowTest.InitCore();
+            HeadlessUi.Errors.Clear();
+            var original = DocManager.Inst.Project;
+            var project = Core.Format.Ustx.Create();
+            // Registered up front: a change to the expressions resets the dialog's expression page, which logs
+            // binding errors while nothing is selected there.
+            project.RegisterExpression(Core.VoiceActing.VoiceCharacter.IntonationDescriptor());
+            DocManager.Inst.ExecuteCmd(new LoadProjectNotification(project));
+            var window = new ExpressionsDialog { Width = 1500, Height = 1000 };
+            try {
+                window.Show();
+                window.FindControl<TabStrip>("Tabs")!.SelectedIndex = 2;
+                HeadlessUi.Flush();
+                var editor = window.FindControl<ExpressionGraphEditor>("GraphEditor")!;
+                var canvas = editor.FindControl<ExpressionGraphCanvas>("Canvas")!;
+                Assert.True(editor.FindControl<Button>("NewCharacterButton")!.IsEnabled);
+                var character = Core.VoiceActing.VoiceCharacter.Preset("cheerful");
+                character.AddToProject(project, Renderers.CLASSIC);
+                HeadlessUi.Flush();
+                var graph = project.expressionGraphs!.Single();
+                Assert.Equal(graph.nodes.Count, Nodes(canvas).Length);
+                Assert.Equal(Renderers.CLASSIC, graph.renderer);
+                Assert.True(project.expressions.ContainsKey(Core.VoiceActing.VoiceCharacter.IntonationCurve));
+                HeadlessUi.SaveScreenshot(window, nameof(VoiceCharactersOpenInTheEditor));
+                var errors = HeadlessUi.Errors.Snapshot();
+                Assert.True(errors.Count == 0, string.Join("\n", errors));
+            } finally {
+                window.Close();
+                DocManager.Inst.ExecuteCmd(new LoadProjectNotification(original));
+            }
+        });
+
+        [Fact]
         public void RateSliderCommitsAndUndoes() => HeadlessUi.Run(() => {
             MainWindowTest.InitCore();
             HeadlessUi.Errors.Clear();

@@ -126,6 +126,28 @@ namespace OpenUtau.App.Controls {
             menu.Open(NewButton);
         }
 
+        /// <summary>A voice character graph from a preset, for a renderer: the renderers the tracks use first.</summary>
+        void OnNewCharacter(object? sender, RoutedEventArgs e) {
+            var menu = new ContextMenu();
+            var used = Project.tracks.Select(t => t.RendererSettings?.renderer).Where(r => r != null)
+                .Select(r => Renderers.GetExpressionGraphSlot(r!)).Distinct().ToList();
+            foreach (var renderer in used.Concat(renderers.Where(r => !used.Contains(r)))) {
+                var item = new MenuItem { Header = renderer };
+                foreach (var preset in Core.VoiceActing.VoiceCharacter.PresetNames) {
+                    var presetItem = new MenuItem { Header = ThemeManager.GetString($"voiceacting.preset.{preset}") };
+                    presetItem.Click += (s, args) => {
+                        var character = Core.VoiceActing.VoiceCharacter.Preset(preset);
+                        character.name = ThemeManager.GetString($"voiceacting.preset.{preset}");
+                        selectedId = character.AddToProject(Project, renderer!);
+                        Refresh();
+                    };
+                    item.Items.Add(presetItem);
+                }
+                menu.Items.Add(item);
+            }
+            menu.Open(NewCharacterButton);
+        }
+
         void Create(string renderer) {
             string? id = null;
             ExpressionGraphEdits.Apply(Project, draft => {

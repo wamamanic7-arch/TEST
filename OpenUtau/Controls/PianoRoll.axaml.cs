@@ -144,7 +144,11 @@ namespace OpenUtau.App.Controls {
                 new FixOverlap(),
                 new BakePitch(),
                 new RandomizeTiming(),
-                new RandomizePhonemeOffset()
+                new RandomizePhonemeOffset(),
+                new NotesFromRecording(),
+                new AlignNotesToRecording(),
+                new FollowRecording(),
+                new CharacterFromRecording(),
             }.Select(edit => new MenuItemViewModel() {
                 Header = ThemeManager.GetString(edit.Name),
                 Command = noteBatchEditCommand,

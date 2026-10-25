@@ -124,6 +124,9 @@ namespace OpenUtau.Core.ExpressionGraph {
         public const string NotePosition = "note_position";
         public const string PhraseNotes = "phrase_notes";
         public const string NoteEnvelope = "note_envelope";
+        public const string Fluctuation = "fluctuation";
+        public const string PhrasePosition = "phrase_position";
+        public const string Intonation = "intonation";
 
         /// <summary>The port of single-input nodes.</summary>
         public const string Value = "value";
@@ -357,6 +360,73 @@ namespace OpenUtau.Core.ExpressionGraph {
                     return (float)Math.Clamp(y, 0, 1);
                 });
             }),
+
+            // Smooth random wandering within plus or minus depth, like the unsteadiness of a human voice: octaves
+            // of interpolated noise, each twice as fast and half as strong. Time counts from the project start.
+            new GraphNodeType(Fluctuation, GraphNodeRole.Input, new[] { "depth" }, new float[] { 1 }, a => {
+                double rate = a.Node.GetFloat("rate", 4);
+                if (!double.IsFinite(rate) || rate < 0) rate = 0;
+                int octaves = (int)Math.Clamp(a.Node.GetFloat("octaves", 3), 1, 8);
+                int.TryParse(a.Node.GetString("seed"), NumberStyles.Integer, CultureInfo.InvariantCulture, out int seed);
+                var result = new float[a.Ticks.Length];
+                for (int i = 0; i < result.Length; i++) {
+                    double time = a.Context.MsAt(a.Ticks[i]) / 1000.0;
+                    result[i] = (float)(a.Inputs[0][i] * FractalNoise(time * rate, octaves, seed));
+                }
+                return result;
+            }),
+            // Where in its phrase a tick is, by time: from 0 at the first note's start to 1 at the last note's end,
+            // and the seconds since the start and until the end.
+            new GraphNodeType(PhrasePosition, GraphNodeRole.Input, none, new float[0],
+                new[] { "position", "elapsed", "remaining" }, a => {
+                    var position = new float[a.Ticks.Length];
+                    var elapsed = new float[a.Ticks.Length];
+                    var remaining = new float[a.Ticks.Length];
+                    for (int i = 0; i < a.Ticks.Length; i++) {
+                        var span = a.Context.PhraseSpanAt(a.Ticks[i], a.PhonemeIndices?[i]);
+                        if (span == null) {
+                            continue;
+                        }
+                        var (start, end) = span.Value;
+                        double startMs = a.Context.MsAt(start);
+                        double length = Math.Max(0, a.Context.MsAt(end) - startMs);
+                        double ms = Math.Clamp(a.Context.MsAt(a.Ticks[i]) - startMs, 0, length);
+                        position[i] = length > 0 ? (float)(ms / length) : 0;
+                        elapsed[i] = (float)(ms / 1000);
+                        remaining[i] = (float)((length - ms) / 1000);
+                    }
+                    return new[] { position, elapsed, remaining };
+                }),
+            // The melody of a spoken phrase in cents: it drifts down by the declination from start to end, bends by
+            // "final" (negative falls, as a statement does; positive rises, as a question does) over its last
+            // final_ms, and each syllable arcs up by "arc" in its middle.
+            new GraphNodeType(Intonation, GraphNodeRole.Input, new[] { "declination", "final", "arc" },
+                new float[] { 150, -250, 30 }, a => {
+                    double finalMs = Math.Max(1, a.Node.GetFloat("final_ms", 400));
+                    var context = a.Context;
+                    var result = new float[a.Ticks.Length];
+                    for (int i = 0; i < result.Length; i++) {
+                        int tick = a.Ticks[i];
+                        double y = 0;
+                        var span = context.PhraseSpanAt(tick, a.PhonemeIndices?[i]);
+                        if (span != null) {
+                            var (start, end) = span.Value;
+                            double startMs = context.MsAt(start);
+                            double length = Math.Max(0, context.MsAt(end) - startMs);
+                            double ms = Math.Clamp(context.MsAt(tick) - startMs, 0, length);
+                            double position = length > 0 ? ms / length : 0;
+                            double ending = Math.Clamp(1 - (length - ms) / finalMs, 0, 1);
+                            y += a.Inputs[0][i] * (0.5 - position) + a.Inputs[1][i] * ending * ending;
+                        }
+                        if (context.NoteAt(tick) is { Duration: > 0 } note) {
+                            double t = (double)(tick - note.Position) / note.Duration;
+                            // Centred, so the arcs don't raise the phrase as a whole.
+                            y += a.Inputs[2][i] * (Math.Sin(Math.PI * t) - 2 / Math.PI);
+                        }
+                        result[i] = (float)y;
+                    }
+                    return result;
+                }),
         }.ToDictionary(t => t.Name);
 
         public static IReadOnlyDictionary<string, GraphNodeType> All => types;
@@ -365,6 +435,7 @@ namespace OpenUtau.Core.ExpressionGraph {
         public const string MathCategory = "math";
         public const string TimeCategory = "time";
         public const string LogicCategory = "logic";
+        public const string VoiceCategory = "voice";
         public const string OutputCategory = "output";
 
         /// <summary>Node types by category, in the order the editor offers them.</summary>
@@ -373,6 +444,7 @@ namespace OpenUtau.Core.ExpressionGraph {
             (MathCategory, new[] { Add, Subtract, Multiply, Divide, Mix, Min, Max, Abs, MapRange, Clamp }),
             (TimeCategory, new[] { Time, Lfo, RandomRange, NotePosition, PhraseNotes, NoteEnvelope, Smooth, Slew }),
             (LogicCategory, new[] { Compare, And, Or, Not, IfElse }),
+            (VoiceCategory, new[] { Intonation, Fluctuation, PhrasePosition }),
             (OutputCategory, new[] { CurveOutput, PhonemeOutput, PitchOutput }),
         };
 
@@ -411,6 +483,8 @@ namespace OpenUtau.Core.ExpressionGraph {
             },
             [Compare] = new[] { new GraphNodeParameter("operator", GraphParameterKind.Choice, "less",
                 "less", "less_equal", "greater", "greater_equal", "equal", "not_equal") },
+            [Fluctuation] = new[] { Number("rate", "4"), Number("octaves", "3"), Number("seed", "0") },
+            [Intonation] = new[] { Number("final_ms", "400") },
         };
 
         /// <summary>
@@ -504,6 +578,33 @@ namespace OpenUtau.Core.ExpressionGraph {
                 x ^= x >> 31;
                 return (x >> 11) * (1.0 / 9007199254740992.0);
             }
+        }
+
+        /// <summary>
+        /// Noise in [-1, 1] at time <paramref name="x"/> in cycles: random values at whole cycles, joined by
+        /// Catmull-Rom splines, summed over octaves. Depends only on x and the seed.
+        /// </summary>
+        internal static double FractalNoise(double x, int octaves, int seed) {
+            double sum = 0, norm = 0, amplitude = 1;
+            for (int k = 0; k < octaves; k++) {
+                sum += amplitude * SmoothNoise(x, seed + k * 1013);
+                norm += amplitude;
+                amplitude *= 0.5;
+                x *= 2;
+            }
+            return Math.Clamp(sum / norm, -1, 1);
+        }
+
+        static double SmoothNoise(double x, int seed) {
+            double floor = Math.Floor(x);
+            long i = (long)floor;
+            double t = x - floor;
+            double p0 = 2 * RandomUnit(i - 1, seed) - 1;
+            double p1 = 2 * RandomUnit(i, seed) - 1;
+            double p2 = 2 * RandomUnit(i + 1, seed) - 1;
+            double p3 = 2 * RandomUnit(i + 2, seed) - 1;
+            return 0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
+                + (3 * p1 - p0 - 3 * p2 + p3) * t * t * t);
         }
 
         // Local evaluation state only, like Smooth. A changed target restarts the transition

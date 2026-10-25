@@ -101,6 +101,59 @@ namespace OpenUtau.Core.ExpressionGraph {
             return group < 0 ? (-1, 0) : (Array.IndexOf(phraseNotes[group], note), phraseNotes[group].Length);
         }
 
+        /// <summary>
+        /// The part-relative ticks where the phrase around a tick starts and ends: its first note's start and its
+        /// last note's end. In a phrase build that is the phrase being built; otherwise notes that touch or
+        /// overlap make one phrase, and a tick between phrases belongs to the nearest note's. Null without notes.
+        /// </summary>
+        public (int start, int end)? PhraseSpanAt(int tick, int? phonemeIndex = null) {
+            if (phraseSource != null) {
+                int group = activePhrase;
+                if (phonemeIndex is int p && p >= 0 && p < phraseSource.Phonemes.Length) {
+                    group = Array.FindIndex(phraseSource.PhraseGroups, g => p >= g.Start && p < g.End);
+                } else if (group < 0 && NoteAt(tick) is NoteSource note) {
+                    group = Array.FindIndex(phraseSource.PhraseNoteIndex.Value, ns => Array.IndexOf(ns, note.Index) >= 0);
+                }
+                if (group >= 0 && phraseSource.PhraseNoteIndex.Value[group] is { Length: > 0 } indices) {
+                    var groupNotes = indices.Select(i => phraseSource.Notes[i]).ToArray();
+                    return (groupNotes.Min(n => n.Position), groupNotes.Max(n => n.End));
+                }
+            }
+            if (notes.Length == 0) {
+                return null;
+            }
+            // The last note starting at or before the tick, or the next one if it is nearer.
+            int found = 0;
+            for (int lo = 0, hi = notes.Length - 1; lo <= hi;) {
+                int mid = (lo + hi) / 2;
+                if (notes[mid].Position <= tick) {
+                    found = mid;
+                    lo = mid + 1;
+                } else {
+                    hi = mid - 1;
+                }
+            }
+            if (found + 1 < notes.Length && tick >= notes[found].End
+                    && notes[found + 1].Position - tick < tick - notes[found].End) {
+                found++;
+            }
+            int first = found, last = found, end = notes[found].End;
+            while (first > 0 && notes[first - 1].End >= notes[first].Position) {
+                first--;
+            }
+            while (last + 1 < notes.Length && notes[last + 1].Position <= end) {
+                last++;
+                end = Math.Max(end, notes[last].End);
+            }
+            for (int i = first; i < found; i++) {
+                end = Math.Max(end, notes[i].End);
+            }
+            return (notes[first].Position, end);
+        }
+
+        /// <summary>Milliseconds from the start of the project at a part-relative tick.</summary>
+        public double MsAt(int tick) => Axis.TickPosToMsPos(PartPosition + tick);
+
         /// <summary>A curve's value at a part-relative tick, exactly as the renderer reads it without a graph.</summary>
         public float SampleCurve(string? abbr, int tick) {
             if (abbr != null && curves.TryGetValue(abbr, out var curve)) {
